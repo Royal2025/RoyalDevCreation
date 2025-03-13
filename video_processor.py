@@ -1,7 +1,7 @@
 import os
 import logging
+import subprocess
 from datetime import datetime
-import ffmpeg
 
 logger = logging.getLogger(__name__)
 
@@ -14,59 +14,62 @@ def create_video(avatar_url: str, audio_path: str, text: str) -> str:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"output/video_{timestamp}.mp4"
 
-        # Get audio duration
+        # Get audio duration using ffprobe
         try:
-            probe = ffmpeg.probe(audio_path)
-            duration = float(probe['streams'][0]['duration'])
+            probe_cmd = [
+                'ffprobe', 
+                '-v', 'error',
+                '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1',
+                audio_path
+            ]
+            duration = float(subprocess.check_output(probe_cmd).decode().strip())
             logger.debug(f"Audio duration: {duration} seconds")
-        except Exception as e:
+        except subprocess.CalledProcessError as e:
             logger.error(f"Error probing audio file: {str(e)}")
             duration = 10  # Fallback duration
 
-        try:
-            # Create black background
-            background = ffmpeg.input(
-                f'color=c=black:s=1280x720:d={duration}',
-                f='lavfi'
-            )
+        # Construct FFmpeg command
+        ffmpeg_cmd = [
+            'ffmpeg',
+            # Input 1: Create black background
+            '-f', 'lavfi',
+            '-i', f'color=c=black:s=1280x720:d={duration}',
+            # Input 2: Avatar image
+            '-i', avatar_url,
+            # Input 3: Audio file
+            '-i', audio_path,
+            # Video filters
+            '-filter_complex',
+            '[1:v]scale=720:-1[avatar];[avatar]pad=1280:720:(ow-iw)/2:(oh-ih)/2[scaled];[0:v][scaled]overlay=0:0',
+            # Output options
+            '-c:a', 'aac',
+            '-c:v', 'libx264',
+            '-preset', 'medium',
+            '-pix_fmt', 'yuv420p',
+            '-movflags', '+faststart',
+            '-y',  # Overwrite output file if exists
+            output_file
+        ]
 
-            # Input avatar and scale it
-            avatar = (
-                ffmpeg.input(avatar_url)
-                .filter('scale', 720, -1)  # Scale avatar maintaining aspect ratio
-                .filter('pad', 1280, 720, '(ow-iw)/2', '(oh-ih)/2')  # Center avatar
-            )
+        # Execute FFmpeg command
+        logger.debug(f"Running FFmpeg command: {' '.join(ffmpeg_cmd)}")
+        process = subprocess.run(
+            ffmpeg_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
 
-            # Input audio
-            audio = ffmpeg.input(audio_path)
+        if process.returncode != 0:
+            logger.error(f"FFmpeg error: {process.stderr}")
+            raise Exception(f"FFmpeg processing failed: {process.stderr}")
 
-            # Combine video and audio streams
-            out = ffmpeg.output(
-                background.overlay(avatar),
-                audio,
-                output_file,
-                acodec='aac',
-                vcodec='h264',
-                pix_fmt='yuv420p',
-                preset='medium',  # Balance between speed and quality
-                movflags='+faststart',  # Enable fast start for web playback
-                **{'b:v': '2M'}  # Set video bitrate
-            ).overwrite_output()
-
-            # Run FFmpeg command
-            logger.debug("Running FFmpeg command...")
-            ffmpeg.run(out, capture_stdout=True, capture_stderr=True)
-
-            if os.path.exists(output_file):
-                logger.info(f"Successfully created video: {output_file}")
-                return output_file
-            else:
-                raise Exception("Output file was not created")
-
-        except ffmpeg.Error as e:
-            error_message = e.stderr.decode() if e.stderr else str(e)
-            logger.error(f"FFmpeg error: {error_message}")
-            raise Exception(f"FFmpeg processing failed: {error_message}")
+        if os.path.exists(output_file):
+            logger.info(f"Successfully created video: {output_file}")
+            return output_file
+        else:
+            raise Exception("Output file was not created")
 
     except Exception as e:
         logger.error(f"Error creating video: {str(e)}")
