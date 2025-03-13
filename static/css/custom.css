@@ -1,0 +1,34 @@
+.avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.avatar-item {
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.avatar-item:hover {
+    border-color: var(--bs-primary);
+}
+
+.avatar-item.selected {
+    border-color: var(--bs-success);
+    background-color: rgba(var(--bs-success-rgb), 0.1);
+}
+
+.avatar-image {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+#videoPreview {
+    background-color: var(--bs-dark);
+    border-radius: 8px;
+}

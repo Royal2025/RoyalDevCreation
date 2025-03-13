@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title mb-4">Create Your AI Video</h2>
+                
+                <!-- Avatar Selection -->
+                <div class="mb-4">
+                    <h4>Select Avatar</h4>
+                    <div class="avatar-grid">
+                        {% for avatar in avatars %}
+                        <div class="avatar-item">
+                            <img src="{{ avatar }}" alt="Avatar" class="avatar-image" data-url="{{ avatar }}">
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Text Input -->
+                <div class="mb-4">
+                    <h4>Enter Text</h4>
+                    <textarea id="textInput" class="form-control" rows="4" placeholder="Enter the text for your video..."></textarea>
+                </div>
+
+                <!-- Voice Selection -->
+                <div class="mb-4">
+                    <h4>Select Voice</h4>
+                    <select id="voiceSelect" class="form-select">
+                        <option value="en-US-AriaNeural">English (US) - Aria</option>
+                        <option value="en-GB-SoniaNeural">English (UK) - Sonia</option>
+                        <option value="en-US-GuyNeural">English (US) - Guy</option>
+                    </select>
+                </div>
+
+                <!-- Generate Button -->
+                <button id="generateBtn" class="btn btn-primary" onclick="generateVideo()">
+                    <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                    Generate Video
+                </button>
+            </div>
+        </div>
+
+        <!-- Preview Section -->
+        <div id="previewSection" class="card mt-4 d-none">
+            <div class="card-body">
+                <h4>Preview</h4>
+                <video id="videoPreview" controls class="w-100 mb-3"></video>
+                <button id="downloadBtn" class="btn btn-success" onclick="downloadVideo()">
+                    <i class="bi bi-download"></i> Download Video
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}
