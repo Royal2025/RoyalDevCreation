@@ -81,18 +81,24 @@ def generate():
         )
         db.session.add(generation)
         db.session.commit()
+        logger.debug(f"Created video generation record with ID: {generation.id}")
 
         try:
             # Generate speech
+            logger.debug("Generating speech...")
             audio_path = generate_speech(text, voice)
+            logger.debug(f"Speech generated successfully: {audio_path}")
 
             # Create video with animation
+            logger.debug("Creating video...")
             video_path = create_video(avatar_url, audio_path, text)
+            logger.debug(f"Video created successfully: {video_path}")
 
             # Update database entry
             generation.video_path = video_path
             generation.status = 'completed'
             db.session.commit()
+            logger.debug("Database updated with completed status")
 
             # Cleanup old files
             cleanup_old_files()
@@ -103,6 +109,7 @@ def generate():
                 'generation': generation.to_dict()
             })
         except Exception as e:
+            logger.error(f"Error in video generation process: {str(e)}")
             generation.status = 'failed'
             db.session.commit()
             raise e
