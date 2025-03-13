@@ -1,7 +1,7 @@
 import os
-import ffmpeg
 import logging
 from datetime import datetime
+import ffmpeg
 
 logger = logging.getLogger(__name__)
 
@@ -10,18 +10,19 @@ def create_video(avatar_url: str, audio_path: str, text: str) -> str:
     try:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"output/video_{timestamp}.mp4"
-        
+
         # Create video with ffmpeg
-        stream = ffmpeg.input('color=c=black:s=1280x720:d=10', f='lavfi')
-        stream = ffmpeg.overlay(stream, ffmpeg.input(avatar_url))
-        stream = ffmpeg.input(audio_path)
-        
-        stream = ffmpeg.output(stream, output_file,
-                             acodec='aac',
-                             vcodec='h264',
-                             pix_fmt='yuv420p')
-        
-        ffmpeg.run(stream, overwrite_output=True)
+        (
+            ffmpeg
+            .input('color=c=black:s=1280x720:d=10', f='lavfi')
+            .overlay(ffmpeg.input(avatar_url))
+            .output(audio_path, output_file,
+                   acodec='aac',
+                   vcodec='h264',
+                   pix_fmt='yuv420p')
+            .overwrite_output()
+            .run()
+        )
         return output_file
     except Exception as e:
         logger.error(f"Error creating video: {str(e)}")
