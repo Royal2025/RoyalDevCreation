@@ -39,6 +39,28 @@ def index():
         logger.error(f"Error loading index page: {str(e)}")
         return render_template('index.html', error="Failed to load avatars")
 
+@app.route('/preview-voice', methods=['POST'])
+def preview_voice():
+    try:
+        data = request.json
+        text = data.get('text')
+        voice = data.get('voice', 'en-US-AriaNeural')
+
+        if not text:
+            return jsonify({'error': 'Missing text parameter'}), 400
+
+        # Generate preview audio
+        audio_path = generate_speech(text, voice)
+
+        # Return audio file URL
+        return jsonify({
+            'status': 'success',
+            'audio_url': f'/download/{os.path.basename(audio_path)}'
+        })
+    except Exception as e:
+        logger.error(f"Error previewing voice: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/generate', methods=['POST'])
 def generate():
     try:

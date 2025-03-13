@@ -13,39 +13,49 @@ def create_video(avatar_url: str, audio_path: str, text: str) -> str:
         output_file = f"output/video_{timestamp}.mp4"
 
         # Get audio duration using ffprobe
-        probe = ffmpeg.probe(audio_path)
-        duration = float(probe['streams'][0]['duration'])
+        try:
+            probe = ffmpeg.probe(audio_path)
+            duration = float(probe['streams'][0]['duration'])
+            logger.debug(f"Audio duration: {duration} seconds")
+        except Exception as e:
+            logger.error(f"Error probing audio file: {str(e)}")
+            duration = 10  # Fallback duration
 
         # Create video with ffmpeg
-        stream = (
-            ffmpeg
-            .input('color=c=black:s=1280x720:d=' + str(duration), f='lavfi')
-            .overlay(
+        try:
+            input_stream = ffmpeg.input('color=c=black:s=1280x720:d=' + str(duration), f='lavfi')
+            avatar_stream = (
                 ffmpeg.input(avatar_url)
                 .filter('scale', 720, -1)  # Scale avatar while maintaining aspect ratio
                 .filter('pad', 1280, 720, '(ow-iw)/2', '(oh-ih)/2')  # Center avatar
             )
-        )
 
-        # Add audio
-        stream = ffmpeg.input(audio_path).output(
-            stream,
-            output_file,
-            acodec='aac',
-            vcodec='h264',
-            pix_fmt='yuv420p',
-            shortest=None  # End when shortest input ends
-        )
+            # Overlay avatar on background
+            video = input_stream.overlay(avatar_stream)
 
-        # Run ffmpeg
-        ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
+            # Add audio
+            audio = ffmpeg.input(audio_path)
 
-        logger.info(f"Successfully created video: {output_file}")
-        return output_file
+            # Combine and output
+            stream = ffmpeg.output(
+                video, audio,
+                output_file,
+                acodec='aac',
+                vcodec='h264',
+                pix_fmt='yuv420p',
+                shortest=None  # End when shortest input ends
+            )
 
-    except ffmpeg.Error as e:
-        logger.error(f"FFmpeg error: {e.stderr.decode() if e.stderr else str(e)}")
-        raise Exception("Failed to create video - FFmpeg error")
+            # Run ffmpeg
+            ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
+
+            logger.info(f"Successfully created video: {output_file}")
+            return output_file
+
+        except ffmpeg.Error as e:
+            logger.error(f"FFmpeg processing error: {e.stderr.decode() if e.stderr else str(e)}")
+            raise Exception("Failed to process video with FFmpeg")
+
     except Exception as e:
         logger.error(f"Error creating video: {str(e)}")
         raise Exception("Failed to create video")
