@@ -6,20 +6,22 @@ from tts_engine import generate_speech
 from avatars import get_random_avatars
 from video_processor import create_video
 from utils import cleanup_old_files
+from models import db, VideoGeneration  # Import `db` after initializing
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Initialize Flask and SQLAlchemy
+# Initialize Flask
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "default-secret-key")
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
 
-# Import models after db initialization to avoid circular imports
-from models import VideoGeneration
+# Set database (SQLite as default)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize SQLAlchemy
+db.init_app(app)
 
 # Ensure output directory exists
 os.makedirs("output", exist_ok=True)
@@ -28,16 +30,24 @@ os.makedirs("output", exist_ok=True)
 def index():
     try:
         avatars = get_random_avatars(20)
-        # Get recent generations
         recent_generations = VideoGeneration.query.order_by(
             VideoGeneration.created_at.desc()
         ).limit(5).all()
-        return render_template('index.html', 
-                             avatars=avatars,
-                             recent_generations=recent_generations)
+        return render_template('index.html',
+                               avatars=avatars,
+                               recent_generations=recent_generations)
     except Exception as e:
         logger.error(f"Error loading index page: {str(e)}")
         return render_template('index.html', error="Failed to load avatars")
+
+@app.route('/fetch-avatars', methods=['GET'])
+def fetch_avatars():
+    try:
+        avatars = get_random_avatars(20)
+        return jsonify({'status': 'success', 'avatars': avatars})
+    except Exception as e:
+        logger.error(f"Error fetching avatars: {str(e)}")
+        return jsonify({'error': 'Failed to fetch avatars'}), 500
 
 @app.route('/preview-voice', methods=['POST'])
 def preview_voice():
@@ -49,10 +59,8 @@ def preview_voice():
         if not text:
             return jsonify({'error': 'Missing text parameter'}), 400
 
-        # Generate preview audio
         audio_path = generate_speech(text, voice)
 
-        # Return audio file URL
         return jsonify({
             'status': 'success',
             'audio_url': f'/download/{os.path.basename(audio_path)}'
@@ -72,7 +80,6 @@ def generate():
         if not all([text, avatar_url]):
             return jsonify({'error': 'Missing required parameters'}), 400
 
-        # Create database entry
         generation = VideoGeneration(
             text=text,
             avatar_url=avatar_url,
@@ -84,23 +91,17 @@ def generate():
         logger.debug(f"Created video generation record with ID: {generation.id}")
 
         try:
-            # Generate speech
-            logger.debug("Generating speech...")
             audio_path = generate_speech(text, voice)
             logger.debug(f"Speech generated successfully: {audio_path}")
 
-            # Create video with animation
-            logger.debug("Creating video...")
             video_path = create_video(avatar_url, audio_path, text)
             logger.debug(f"Video created successfully: {video_path}")
 
-            # Update database entry
             generation.video_path = video_path
             generation.status = 'completed'
             db.session.commit()
             logger.debug("Database updated with completed status")
 
-            # Cleanup old files
             cleanup_old_files()
 
             return jsonify({
