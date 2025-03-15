@@ -13,7 +13,6 @@ class AvatarRenderer {
             const svgText = await response.text();
             this.svg.innerHTML = svgText;
             
-            // Initialize animation transforms
             this.initializeTransforms();
         } catch (error) {
             console.error('Error initializing avatar:', error);
@@ -21,25 +20,27 @@ class AvatarRenderer {
     }
 
     initializeTransforms() {
-        // Add transform groups for animation
         const avatar = this.svg.querySelector('svg');
         if (!avatar) return;
 
-        // Create transform groups for head and body
         this.headGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
         this.headGroup.setAttribute('id', 'head-group');
         
         this.bodyGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
         this.bodyGroup.setAttribute('id', 'body-group');
 
-        // Move relevant elements to groups
-        const headElements = avatar.querySelectorAll('path[id*="head"], path[id*="face"], path[id*="mouth"]');
-        const bodyElements = avatar.querySelectorAll('path[id*="body"], path[id*="cloth"]');
+        // Head और Body को सीधे Move करने का सही तरीका
+        const headElements = avatar.querySelectorAll('[id*="head"], [id*="face"], [id*="mouth"]');
+        const bodyElements = avatar.querySelectorAll('[id*="body"], [id*="cloth"]');
 
-        headElements.forEach(el => this.headGroup.appendChild(el.cloneNode(true)));
-        bodyElements.forEach(el => this.bodyGroup.appendChild(el.cloneNode(true)));
+        headElements.forEach(el => {
+            this.headGroup.appendChild(el);
+        });
+        bodyElements.forEach(el => {
+            this.bodyGroup.appendChild(el);
+        });
 
-        // Clear and rebuild avatar
+        // Avatar को री-बिल्ड करो
         avatar.innerHTML = '';
         avatar.appendChild(this.bodyGroup);
         avatar.appendChild(this.headGroup);
@@ -58,27 +59,20 @@ class AvatarRenderer {
         if (!this.currentAnimation || !this.headGroup || !this.bodyGroup) return;
 
         const currentTime = (performance.now() - this.startTime) / 1000;
-        
-        // Find current animation frame
         const frame = this.getCurrentFrame(currentTime);
         if (!frame) return;
 
-        // Apply transforms
         this.applyTransforms(frame);
-
-        // Apply lip sync if available
         if (this.lipSyncData) {
             this.applyLipSync(currentTime);
         }
 
-        // Continue animation
         this.animationFrame = requestAnimationFrame(() => this.animate());
     }
 
     getCurrentFrame(currentTime) {
         if (!this.currentAnimation || this.currentAnimation.length === 0) return null;
 
-        // Find surrounding keyframes
         let prevFrame = null;
         let nextFrame = null;
 
@@ -95,7 +89,6 @@ class AvatarRenderer {
         if (!prevFrame) return this.currentAnimation[0];
         if (!nextFrame) return prevFrame;
 
-        // Interpolate between frames
         const t = (currentTime - prevFrame.timestamp) / 
                  (nextFrame.timestamp - prevFrame.timestamp);
         
@@ -124,40 +117,32 @@ class AvatarRenderer {
     applyTransforms(frame) {
         if (!this.headGroup || !this.bodyGroup) return;
 
-        // Apply head transforms
         const headTransform = `
-            translate(${frame.position.x * 10}px, ${frame.position.y * 10}px)
-            rotateX(${frame.rotation.x * 45}deg)
-            rotateY(${frame.rotation.y * 45}deg)
-            rotateZ(${frame.rotation.z * 45}deg)
+            translate(${frame.position.x * 10}, ${frame.position.y * 10})
+            rotate(${frame.rotation.z * 45})
         `;
-        this.headGroup.style.transform = headTransform;
+        this.headGroup.setAttribute("transform", headTransform);
 
-        // Apply subtle body movement
         const bodyTransform = `
-            translate(${frame.position.x * 5}px, ${frame.position.y * 5}px)
-            rotateZ(${frame.rotation.z * 10}deg)
+            translate(${frame.position.x * 5}, ${frame.position.y * 5})
+            rotate(${frame.rotation.z * 10})
         `;
-        this.bodyGroup.style.transform = bodyTransform;
+        this.bodyGroup.setAttribute("transform", bodyTransform);
     }
 
     applyLipSync(currentTime) {
         const lipData = this.getLipSyncData(currentTime);
         if (!lipData) return;
 
-        // Find mouth elements
-        const mouthElements = this.headGroup.querySelectorAll('path[id*="mouth"]');
+        const mouthElements = this.headGroup.querySelectorAll('[id*="mouth"]');
         mouthElements.forEach(mouth => {
-            // Scale mouth based on lip sync data
-            const scale = `scale(${lipData.mouth_shape.width}, ${lipData.mouth_shape.height})`;
-            mouth.style.transform = scale;
+            mouth.setAttribute("transform", `scale(${lipData.mouth_shape.width}, ${lipData.mouth_shape.height})`);
         });
     }
 
     getLipSyncData(currentTime) {
         if (!this.lipSyncData || this.lipSyncData.length === 0) return null;
 
-        // Find appropriate lip sync frame
         return this.lipSyncData.find(frame => 
             frame.timestamp <= currentTime && 
             frame.timestamp + 0.1 > currentTime
