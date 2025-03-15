@@ -1,8 +1,11 @@
 import numpy as np
 import librosa
 import logging
+import matplotlib.pyplot as plt
 from typing import List, Dict
 
+# Logger Setup
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class LipSync:
@@ -19,10 +22,13 @@ class LipSync:
             
             # Error Handling: Check if audio is empty
             if y is None or len(y) == 0:
-                logger.error("Error: Loaded audio is empty! Check file format.")
+                logger.error("❌ Error: Loaded audio is empty! Check file format.")
                 return []
             
-            print(f"✅ Audio Loaded: {y.shape}, Sample Rate: {sr}")
+            logger.info(f"✅ Audio Loaded: {y.shape}, Sample Rate: {sr}")
+
+            # Plot Audio Waveform (Debugging)
+            self._plot_waveform(y)
 
             # Calculate amplitude envelope
             amplitude_envelope = self._get_amplitude_envelope(y)
@@ -35,6 +41,15 @@ class LipSync:
             logger.error(f"❌ Error analyzing audio: {str(e)}")
             return []
 
+    def _plot_waveform(self, y: np.ndarray):
+        """Plot audio waveform for debugging"""
+        plt.figure(figsize=(10, 4))
+        plt.plot(y, alpha=0.7)
+        plt.title("Audio Waveform")
+        plt.xlabel("Samples")
+        plt.ylabel("Amplitude")
+        plt.show()
+
     def _get_amplitude_envelope(self, y: np.ndarray) -> np.ndarray:
         """Calculate amplitude envelope of the audio signal"""
         try:
@@ -42,8 +57,8 @@ class LipSync:
             rms = librosa.feature.rms(y=y, frame_length=self.frame_length, hop_length=self.hop_length)[0]
             
             # Debugging Logs
-            print(f"📊 RMS Shape: {rms.shape}, Min: {rms.min()}, Max: {rms.max()}")
-            
+            logger.info(f"📊 RMS Shape: {rms.shape}, Min: {rms.min()}, Max: {rms.max()}")
+
             # Error Handling: Check if min and max are same (Avoid division by zero)
             if rms.max() == rms.min():
                 logger.warning("⚠️ RMS has no variation. Returning zeroed data.")
@@ -79,7 +94,12 @@ class LipSync:
                 }
                 movements.append(keyframe)
 
-            print(f"✅ {len(movements)} Lip Movements Generated.")
+            logger.info(f"✅ {len(movements)} Lip Movements Generated.")
+            
+            # Debug First 10 Movements
+            for i, movement in enumerate(movements[:10]):  
+                logger.info(f"🔹 Time: {movement['timestamp']}s, Mouth Open: {movement['mouth_open']}")
+            
             return movements
         except Exception as e:
             logger.error(f"❌ Error converting amplitude to lip movement: {str(e)}")
